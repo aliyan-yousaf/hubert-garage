@@ -122,6 +122,64 @@
     play();
   }
 
+
+  // Hero stats counters (VAG / -20% / 100%)
+  // Numbers count up from 0; the text-only item ("VAG") gets a letter-shuffle reveal.
+  var statEls = document.querySelectorAll('.hero-stats b');
+  if (statEls.length) {
+    var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    var easeOut = function (t) { return 1 - Math.pow(1 - t, 3); };
+
+    var prepared = [];
+    statEls.forEach(function (el) {
+      var final = el.textContent.trim();
+      var m = final.match(/^(\D*?)(\d+(?:[.,]\d+)?)(\D*)$/);
+      el.setAttribute('aria-label', final);
+      el.style.fontVariantNumeric = 'tabular-nums';
+      if (m) {
+        prepared.push({ el: el, type: 'num', prefix: m[1], end: parseFloat(m[2].replace(',', '.')), suffix: m[3], final: final });
+        if (!reduceMotion) el.textContent = m[1] + '0' + m[3];
+      } else {
+        prepared.push({ el: el, type: 'text', final: final });
+        if (!reduceMotion) el.textContent = final.replace(/./g, function () { return LETTERS[Math.floor(Math.random() * 26)]; });
+      }
+    });
+
+    function runStat(s, delay) {
+      if (reduceMotion) { s.el.textContent = s.final; return; }
+      var dur = s.type === 'num' ? 1800 : 1400, start = null;
+      setTimeout(function () {
+        function frame(t) {
+          if (!start) start = t;
+          var p = Math.min((t - start) / dur, 1);
+          if (s.type === 'num') {
+            s.el.textContent = s.prefix + Math.round(easeOut(p) * s.end) + s.suffix;
+          } else {
+            var settled = Math.floor(easeOut(p) * s.final.length), out = '';
+            for (var i = 0; i < s.final.length; i++) {
+              out += i < settled ? s.final[i] : LETTERS[Math.floor(Math.random() * 26)];
+            }
+            s.el.textContent = out;
+          }
+          if (p < 1) requestAnimationFrame(frame); else s.el.textContent = s.final;
+        }
+        requestAnimationFrame(frame);
+      }, delay);
+    }
+
+    var heroStats = document.querySelector('.hero-stats');
+    var startStats = function () { prepared.forEach(function (s, i) { runStat(s, i * 200); }); };
+    if ('IntersectionObserver' in window) {
+      var so = new IntersectionObserver(function (entries) {
+        if (entries[0].isIntersecting) { startStats(); so.disconnect(); }
+      }, { threshold: 0.4 });
+      so.observe(heroStats);
+    } else {
+      startStats();
+    }
+  }
+
   // Footer year
   var y = document.getElementById('year');
   if (y) y.textContent = new Date().getFullYear();
